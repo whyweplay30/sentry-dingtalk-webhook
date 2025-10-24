@@ -1,9 +1,9 @@
 import axios from "axios";
+
 const formatTimeStamp = (timestamp) => {
   if (!timestamp) {
     return "未知时间";
   }
-
   // 将时间戳转换为UTC+8时区（中国标准时间）
   const date = new Date(timestamp * 1000);
 
@@ -22,16 +22,30 @@ const formatTimeStamp = (timestamp) => {
 };
 
 const transformTimestamp = (timestamp) => {
-  const utcTime = new Date(timestamp);
-  return formatTimeStamp(utcTime.getTime() / 1000);
+  let utcTime = "";
+  if (typeof timestamp === "number") {
+    utcTime = timestamp;
+  } else {
+    utcTime = new Date(timestamp).getTime() / 1000;
+  }
+  return formatTimeStamp(utcTime);
+};
+
+// 处理data里面的内容
+const handleBody = (body) => {
+  const targetKey = Object.keys(body?.data || {})[0];
+  return body?.data?.[targetKey] || {};
 };
 
 const handleCreatedError = (body) => {
-  const event = body?.data?.issue || {};
+  const event = handleBody(body);
   const title = event.title || "未知错误";
   const url = event.web_url || "无详情链接";
-  const time = transformTimestamp(event.firstSeen || event.lastSeen);
-  const project = event?.project?.name || "未识别项目";
+  const time = transformTimestamp(
+    event.firstSeen || event.lastSeen || event.timestamp
+  );
+  const projectName = event?.url?.match(/\/projects\/[^\/]+\/([^\/]+)\//)?.[1];
+  const project = event?.project?.name || projectName || "未识别项目";
   return {
     title,
     url,
@@ -41,7 +55,7 @@ const handleCreatedError = (body) => {
 };
 
 const handleTriggerError = (body) => {
-  const event = body?.data?.event || body?.data?.error || {};
+  const event = handleBody(body);
   const title = event.title || "未知错误";
   const url = event.web_url || "无详情链接";
   const time = formatTimeStamp(event.timestamp);
@@ -61,8 +75,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    console.log(req,"请求参数")
-    console.log(req.body,"请求参数body")
+    console.log("sentry发出的数据:", JSON.stringify(req.body));
     const body = req.body || {};
     let formatedResult = null;
     if (body.action === "created") {
@@ -70,11 +83,9 @@ export default async function handler(req, res) {
     } else if (body.action === "triggered") {
       formatedResult = handleTriggerError(body);
     } else {
-      console.log(body);
       throw new Error("未知事件类型");
     }
     const { title, url, time, project } = formatedResult;
-
     // 钉钉Webhook地址（安全起见，建议用环境变量）
     const DINGTALK_WEBHOOK =
       process.env.DINGTALK_WEBHOOK ||
@@ -128,4 +139,3 @@ export default async function handler(req, res) {
     });
   }
 }
-
