@@ -29,14 +29,15 @@ export default async function handler(req, res) {
 
   try {
     const body = req.body || {};
-    const event = body?.data?.event || {};
+    const event = body?.data?.event || body?.data?.issue;
     const title = event.title || "未知错误";
-    const project = event.project || "未识别项目";
-    const url = event.web_url || event.url;
+    const url = event.issue_url || event.url;
     const env = event.environment || "unknown";
     const time = formatTimeStamp(event.timestamp);
-    console.log(body, "body");
-    console.log(body?.data, "evebody?.datant");
+    const projectName = event?.url?.match(
+      /\/projects\/[^\/]+\/([^\/]+)\//
+    )?.[1];
+    const project = event.project.name || projectName || "未识别项目";
 
     // 钉钉Webhook地址（安全起见，建议用环境变量）
     const DINGTALK_WEBHOOK =
@@ -57,8 +58,6 @@ export default async function handler(req, res) {
       ? messageContent
       : `${keyword} ${messageContent}`;
 
-    console.log("准备发送钉钉消息:", finalContent);
-
     // 转发到钉钉（添加必要的请求头）
     const response = await axios.post(
       DINGTALK_WEBHOOK,
@@ -75,9 +74,6 @@ export default async function handler(req, res) {
         timeout: 10000, // 10秒超时
       }
     );
-
-    console.log("钉钉响应状态:", response.status);
-    console.log("钉钉响应数据:", response.data);
 
     // 检查钉钉API响应
     if (response.data.errcode !== 0) {
