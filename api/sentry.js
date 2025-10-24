@@ -5,16 +5,35 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
+  const formatTimeStamp = (timestamp) => {
+    if (!timestamp) {
+      return "未知时间";
+    }
+    const date = new Date(timestamp * 1000);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    const hours = String(date.getHours()).padStart(2, "0");
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+    const seconds = String(date.getSeconds()).padStart(2, "0");
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+  };
+
   try {
     const body = req.body || {};
-    console.log("收到Sentry事件:", body);
     const event = body?.data?.event || {};
     const title = event.title || "未知错误";
     const project = event.project || "未识别项目";
     const url = event.web_url || event.url;
     const env = event.environment || "unknown";
-    const time = event.timestamp || "未知时间";
-
+    const time = formatTimeStamp(event.timestamp);
+    console.log(event, "event");
+    console.log(event.metadata, "metadata");
+    console.log(event.modules, "modules");
+    console.log(event.user, "user");
+    console.log(event.exception, "exception");
+    console.log(event.contexts, "contexts");
+    console.log(event.extra, "extra");
     // 钉钉Webhook地址（安全起见，建议用环境变量）
     const DINGTALK_WEBHOOK =
       process.env.DINGTALK_WEBHOOK ||
