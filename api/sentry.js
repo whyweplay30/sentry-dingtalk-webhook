@@ -9,14 +9,22 @@ export default async function handler(req, res) {
     if (!timestamp) {
       return "未知时间";
     }
+
+    // 将时间戳转换为UTC+8时区（中国标准时间）
     const date = new Date(timestamp * 1000);
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    const hours = String(date.getHours()).padStart(2, "0");
-    const minutes = String(date.getMinutes()).padStart(2, "0");
-    const seconds = String(date.getSeconds()).padStart(2, "0");
-    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+
+    // 获取UTC时间并加上8小时（UTC+8）
+    const utcHours = date.getUTCHours();
+    const beijingHours = (utcHours + 8) % 24;
+
+    const year = date.getUTCFullYear();
+    const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+    const day = String(date.getUTCDate()).padStart(2, "0");
+    const hours = String(beijingHours).padStart(2, "0");
+    const minutes = String(date.getUTCMinutes()).padStart(2, "0");
+    const seconds = String(date.getUTCSeconds()).padStart(2, "0");
+
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds} (UTC+8)`;
   };
 
   try {
@@ -27,13 +35,9 @@ export default async function handler(req, res) {
     const url = event.web_url || event.url;
     const env = event.environment || "unknown";
     const time = formatTimeStamp(event.timestamp);
-    console.log(event, "event");
-    console.log(event.metadata, "metadata");
-    console.log(event.modules, "modules");
-    console.log(event.user, "user");
-    console.log(event.exception, "exception");
-    console.log(event.contexts, "contexts");
-    console.log(event.extra, "extra");
+    console.log(body, "body");
+    console.log(body?.data, "evebody?.datant");
+
     // 钉钉Webhook地址（安全起见，建议用环境变量）
     const DINGTALK_WEBHOOK =
       process.env.DINGTALK_WEBHOOK ||
