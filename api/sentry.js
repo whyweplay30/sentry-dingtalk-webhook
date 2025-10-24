@@ -61,6 +61,8 @@ export default async function handler(req, res) {
   }
 
   try {
+    console.log(req,"请求参数")
+    console.log(req.body,"请求参数body")
     const body = req.body || {};
     let formatedResult = null;
     if (body.action === "created") {
