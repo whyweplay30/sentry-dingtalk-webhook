@@ -29,7 +29,7 @@ export default async function handler(req, res) {
 
   try {
     const body = req.body || {};
-    const event = body?.data?.event || body?.data?.issue;
+    const event = body?.data?.event || body?.data?.issue || {};
     const title = event.title || "未知错误";
     const url = event.issue_url || event.url;
     const env = event.environment || "unknown";
@@ -50,7 +50,15 @@ export default async function handler(req, res) {
     }
 
     // 钉钉消息内容（必须包含自定义关键词，如"警告"）
-    const messageContent = `🚨 Sentry错误告警\n项目: ${project}\n环境: ${env}\n标题: ${title}\n详情: ${url}\n时间: ${time}`;
+    const messageContent = `
+    🚨 **Sentry 错误告警**
+    - **项目**: ${project}
+    - **环境**: ${env}
+    - **标题**: ${title}
+    - **详情**: [点击查看](${url})
+    - **时间**: ${time}
+    `;
+
 
     // 确保消息包含关键词（根据你的机器人设置调整）
     const keyword = "警告"; // 替换为你的机器人实际设置的关键词
