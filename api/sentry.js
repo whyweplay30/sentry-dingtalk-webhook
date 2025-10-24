@@ -1,43 +1,77 @@
 import axios from "axios";
+const formatTimeStamp = (timestamp) => {
+  if (!timestamp) {
+    return "未知时间";
+  }
+
+  // 将时间戳转换为UTC+8时区（中国标准时间）
+  const date = new Date(timestamp * 1000);
+
+  // 获取UTC时间并加上8小时（UTC+8）
+  const utcHours = date.getUTCHours();
+  const beijingHours = (utcHours + 8) % 24;
+
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  const hours = String(beijingHours).padStart(2, "0");
+  const minutes = String(date.getUTCMinutes()).padStart(2, "0");
+  const seconds = String(date.getUTCSeconds()).padStart(2, "0");
+
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+};
+
+const transformTimestamp = (timestamp) => {
+  const utcTime = new Date(timestamp);
+  return formatTimeStamp(utcTime.getTime() / 1000);
+};
+
+const handleCreatedError = (body) => {
+  const event = body?.data?.issue || {};
+  const title = event.title || "未知错误";
+  const url = event.web_url || "无详情链接";
+  const time = transformTimestamp(event.firstSeen || event.lastSeen);
+  const project = event?.project?.name || "未识别项目";
+  return {
+    title,
+    url,
+    time,
+    project,
+  };
+};
+
+const handleTriggerError = (body) => {
+  const event = body?.data?.event || {};
+  const title = event.title || "未知错误";
+  const url = event.web_url || "无详情链接";
+  const time = formatTimeStamp(event.timestamp);
+  const projectName = event?.url?.match(/\/projects\/[^\/]+\/([^\/]+)\//)?.[1];
+  const project = projectName || "未识别项目";
+  return {
+    title,
+    url,
+    time,
+    project,
+  };
+};
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const formatTimeStamp = (timestamp) => {
-    if (!timestamp) {
-      return "未知时间";
-    }
-
-    // 将时间戳转换为UTC+8时区（中国标准时间）
-    const date = new Date(timestamp * 1000);
-
-    // 获取UTC时间并加上8小时（UTC+8）
-    const utcHours = date.getUTCHours();
-    const beijingHours = (utcHours + 8) % 24;
-
-    const year = date.getUTCFullYear();
-    const month = String(date.getUTCMonth() + 1).padStart(2, "0");
-    const day = String(date.getUTCDate()).padStart(2, "0");
-    const hours = String(beijingHours).padStart(2, "0");
-    const minutes = String(date.getUTCMinutes()).padStart(2, "0");
-    const seconds = String(date.getUTCSeconds()).padStart(2, "0");
-
-    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds} (UTC+8)`;
-  };
-
   try {
     const body = req.body || {};
-    const event = body?.data?.event || body?.data?.issue || {};
-    const title = event.title || "未知错误";
-    const url = event.issue_url || event.url;
-    const env = event.environment || "unknown";
-    const time = formatTimeStamp(event.timestamp);
-    const projectName = event?.url?.match(
-      /\/projects\/[^\/]+\/([^\/]+)\//
-    )?.[1];
-    const project = event.project.name || projectName || "未识别项目";
+    let formatedResult = null;
+    if (body.action === "created") {
+      formatedResult = handleCreatedError(body);
+    } else if (body.action === "triggered") {
+      formatedResult = handleTriggerError(body);
+    } else {
+      console.log(body);
+      throw new Error("未知事件类型");
+    }
+    const { title, url, time, project } = formatedResult;
 
     // 钉钉Webhook地址（安全起见，建议用环境变量）
     const DINGTALK_WEBHOOK =
@@ -50,9 +84,7 @@ export default async function handler(req, res) {
     }
 
     // 钉钉消息内容（必须包含自定义关键词，如"警告"）
-    // 钉钉消息内容（必须包含自定义关键词，如"警告"）
-    const messageContent = `🚨 Sentry错误告警\n项目: ${project}\n环境: ${env}\n标题: ${title}\n详情: ${url}\n时间: ${time}`;
-
+    const messageContent = `🚨 Sentry错误告警\n项目: ${project}\n标题: ${title}\n详情: ${url}\n时间: ${time}`;
 
     // 确保消息包含关键词（根据你的机器人设置调整）
     const keyword = "警告"; // 替换为你的机器人实际设置的关键词
@@ -94,4 +126,3 @@ export default async function handler(req, res) {
     });
   }
 }
-
