@@ -41,7 +41,7 @@ const handleCreatedError = (body) => {
 };
 
 const handleTriggerError = (body) => {
-  const event = body?.data?.event || {};
+  const event = body?.data?.event || body?.data?.error || {};
   const title = event.title || "未知错误";
   const url = event.web_url || "无详情链接";
   const time = formatTimeStamp(event.timestamp);
@@ -128,3 +128,4 @@ export default async function handler(req, res) {
     });
   }
 }
+
