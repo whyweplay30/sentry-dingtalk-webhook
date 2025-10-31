@@ -1,5 +1,21 @@
 import axios from "axios";
 
+// 去重窗口，默认 10 分钟（可通过环境变量覆盖，单位毫秒）
+const DEDUPE_WINDOW_MS = Number(process.env.DEDUPE_WINDOW_MS) || 10 * 60 * 1000;
+
+// 仅使用内存缓存（部署在 Vercel 时跨实例不可用，但满足短期去重需求）
+const inMemoryCache = {};
+
+function isDuplicate(key) {
+  const now = Date.now();
+  const last = inMemoryCache[key];
+  return last && now - last < DEDUPE_WINDOW_MS;
+}
+
+function markSent(key) {
+  inMemoryCache[key] = Date.now();
+}
+
 const formatTimeStamp = (timestamp) => {
   if (!timestamp) {
     return "未知时间";
@@ -83,9 +99,31 @@ export default async function handler(req, res) {
     } else if (body.action === "triggered") {
       formatedResult = handleTriggerError(body);
     } else {
-      throw new Error("未知事件类型");
+      // throw new Error("未知事件类型");
+      return;
     }
     const { title, url, time, project } = formatedResult;
+
+    // 计算去重 Key：优先使用 issue_id（若存在），否则使用 project+title
+    const rawEvent = handleBody(body) || {};
+    const issueId =
+      rawEvent.issue_id ||
+      rawEvent.id ||
+      rawEvent.issue?.id ||
+      rawEvent.event_id;
+    const dedupeKey = issueId ? `${project}:${issueId}` : `${project}:${title}`;
+
+    if (isDuplicate(dedupeKey)) {
+      console.log(
+        `去重：${dedupeKey} 在 ${DEDUPE_WINDOW_MS}ms 窗口内已发送，跳过发送.`
+      );
+      return res.status(200).json({
+        ok: true,
+        deduped: true,
+        message: "重复告警已合并，未再次发送钉钉",
+      });
+    }
+
     // 钉钉Webhook地址（安全起见，建议用环境变量）
     const DINGTALK_WEBHOOK =
       process.env.DINGTALK_WEBHOOK ||
@@ -127,11 +165,11 @@ export default async function handler(req, res) {
       throw new Error(`钉钉API错误: ${response.data.errmsg}`);
     }
 
+    // 标记为已发送（内存缓存）
+    markSent(dedupeKey);
     res.status(200).json({ ok: true, message: "消息发送成功" });
   } catch (error) {
-    console.error("Webhook转发失败：", error.message);
     console.error("错误详情:", error.response?.data || error);
-
     res.status(500).json({
       error: "转发失败",
       details: error.message,
