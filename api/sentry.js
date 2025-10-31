@@ -111,7 +111,7 @@ export default async function handler(req, res) {
       rawEvent.id ||
       rawEvent.issue?.id ||
       rawEvent.event_id;
-    const dedupeKey = issueId ? `${project}:${issueId}` : `${project}:${title}`;
+    const dedupeKey = issueId;
 
     if (isDuplicate(dedupeKey)) {
       console.log(
@@ -177,3 +177,4 @@ export default async function handler(req, res) {
     });
   }
 }
+
